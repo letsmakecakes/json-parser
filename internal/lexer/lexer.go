@@ -133,7 +133,16 @@ func (l *Lexer) readUnicode() (rune, error) {
 		if !isHexDigit(l.ch) {
 			return 0, fmt.Errorf("invalid Unicode escpae sequence")
 		}
+		hex += string(l.ch)
 	}
+
+	var unicodeValue rune
+	_, err := fmt.Sscanf(hex, "%04x", &unicodeValue)
+	if err != nil {
+		return 0, fmt.Errorf("invalid Unicode escape sequence")
+	}
+
+	return unicodeValue, nil
 }
 
 func isHexDigit(ch byte) bool {

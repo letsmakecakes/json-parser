@@ -14,3 +14,8 @@ const (
 	TokenNull       TokenType = "NULL"
 	TokenEOF        TokenType = "EOF"
 )
+
+type Token struct {
+	Type    TokenType
+	Literal string
+}

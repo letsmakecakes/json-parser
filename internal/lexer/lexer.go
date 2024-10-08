@@ -1,5 +1,10 @@
 package lexer
 
+import (
+	"fmt"
+	"strings"
+)
+
 type TokenType string
 
 const (
@@ -64,7 +69,11 @@ func (l *Lexer) Tokenize() ([]Token, error) {
 			if err != nil {
 				return nil, err
 			}
-			tok = Token{Type: TokenColon}
+			tok = Token{Type: TokenString, Literal: str}
+			tokens = append(tokens, tok)
+			continue
+		case 0:
+			tok
 		}
 	}
 }
@@ -76,5 +85,57 @@ func (l *Lexer) skipWhiteSpace() {
 }
 
 func isWhiteSpace(ch byte) bool {
-	return ch == ' ' || ch == '\t' || ch == '\n' || ch =='\r'
+	return ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r'
+}
+
+func (l *Lexer) readString() (string, error) {
+	var strBuilder strings.Builder
+
+	// Read the opening quote
+	l.readChar()
+
+	for {
+		switch l.ch {
+		case '"': // Closing quote found, return the string
+			l.readChar() // Move past the closing quote
+			return strBuilder.String(), nil
+		case '\\': // Handle escape sequences
+			l.readChar() // Move past the backlash
+			switch l.ch {
+			case '"':
+				strBuilder.WriteByte('"')
+			case '\\':
+				strBuilder.WriteByte('\\')
+			case '/':
+				strBuilder.WriteByte('/')
+			case 'b':
+				strBuilder.WriteByte('\b')
+			case 'f':
+				strBuilder.WriteByte('\f')
+			case 'n':
+				strBuilder.WriteByte('\n')
+			case 'r':
+				strBuilder.WriteByte('\r')
+			case 't':
+				strBuilder.WriteByte('\t')
+			case 'u':
+				// Handle Unicode escape sequences (e.g., \uXXXX)
+				unicodeChar, err := l.readUnicode()
+			}
+		}
+	}
+}
+
+func (l *Lexer) readUnicode() (rune, error) {
+	var hex string
+	for i := 0; i < 4; i++ {
+		l.readChar()
+		if !isHexDigit(l.ch) {
+			return 0, fmt.Errorf("invalid Unicode escpae sequence")
+		}
+	}
+}
+
+func isHexDigit(ch byte) bool {
+	return ('0' <= ch && ch <= '9') || ('a' <= ch && ch <= 'f') || ('A' <= ch && ch <= 'F')
 }

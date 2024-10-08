@@ -42,3 +42,39 @@ func (l *Lexer) readChar() {
 	l.position = l.readPosition
 	l.readPosition++
 }
+
+func (l *Lexer) Tokenize() ([]Token, error) {
+	var tokens []Token
+
+	for {
+		l.skipWhiteSpace()
+		var tok Token
+
+		switch l.ch {
+		case '{':
+			tok = Token{Type: TokenLeftBrace, Literal: "{"}
+		case '}':
+			tok = Token{Type: TokenRightBrace, Literal: "}"}
+		case ':':
+			tok = Token{Type: TokenColon, Literal: ":"}
+		case ',':
+			tok = Token{Type: TokenComma, Literal: ","}
+		case '"':
+			str, err := l.readString()
+			if err != nil {
+				return nil, err
+			}
+			tok = Token{Type: TokenColon}
+		}
+	}
+}
+
+func (l *Lexer) skipWhiteSpace() {
+	for isWhiteSpace(l.ch) {
+		l.readChar()
+	}
+}
+
+func isWhiteSpace(ch byte) bool {
+	return ch == ' ' || ch == '\t' || ch == '\n' || ch =='\r'
+}

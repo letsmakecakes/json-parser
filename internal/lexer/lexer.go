@@ -78,20 +78,29 @@ func (l *Lexer) Tokenize() ([]Token, error) {
 			tok = Token{Type: TokenEOF, Literal: ""}
 			tokens = append(tokens, tok)
 			return tokens, nil
+		case 't':
+			if l.peekWord(4) == "true" {
+				tok = Token{Type: TokenTrue, Literal: "true"}
+				l.advanceBy(4)
+			} else {
+				return nil, NewUnexpectedCharacterError(l.ch)
+			}
+		case 'f':
+			if l.peekWord(5) == "false" {
+				tok = Token{Type: TokenFalse, Literal: "false"}
+				l.advanceBy(5)
+			} else {
+				return nil, NewUnexpectedCharacterError(l.ch)
+			}
+		case 'n':
+			if l.peekWord(4) == "null" {
+				tok = Token{Type: TokenNull, Literal: "null"}
+				l.advanceBy(4)
+			} else {
+				return nil, NewUnexpectedCharacterError(l.ch)
+			}
 		default:
-			if isLetter(l.ch) {
-				literal := l.readLiteral()
-				switch literal {
-				case "true":
-					tok = Token{Type: TokenTrue, Literal: literal}
-				case "false":
-					tok = Token{Type: TokenFalse, Literal: literal}
-				case "null":
-					tok = Token{Type: TokenNull, Literal: literal}
-				default:
-					return nil, NewUnexpectedCharacterError(l.ch)
-				}
-			} else if isDigit(l.ch) || l.ch == '-' {
+			if isDigit(l.ch) || l.ch == '-' {
 				num := l.readNumber()
 				tok = Token{Type: TokenNumber, Literal: num}
 			} else {
@@ -280,4 +289,10 @@ func (l *Lexer) peekWord(n int) string {
 	}
 
 	return l.input[l.position:end]
+}
+
+func (l *Lexer) advanceBy(n int) {
+	for i := 0; i < n; i++ {
+		l.readChar()
+	}
 }

@@ -102,3 +102,23 @@ func TestLexer_Numbers(t *testing.T) {
 		t.Errorf("expected tokens %v, got %v", expectedTokens, tokens)
 	}
 }
+
+func TestLexer_Literals(t *testing.T) {
+	input := `true false null`
+	expectedTokens := []Token{
+		{Type: TokenTrue, Literal: "true"},
+		{Type: TokenFalse, Literal: "false"},
+		{Type: TokenNull, Literal: "null"},
+		{Type: TokenEOF, Literal: ""},
+	}
+
+	lexer := NewLexer(input)
+	tokens, err := lexer.Tokenize()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !reflect.DeepEqual(tokens, expectedTokens) {
+		t.Errorf("expected tokens %v, got %v", expectedTokens, tokens)
+	}
+}

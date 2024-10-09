@@ -72,6 +72,14 @@ func (l *Lexer) Tokenize() ([]Token, error) {
 			tok = Token{Type: TokenString, Literal: str}
 			tokens = append(tokens, tok)
 			continue
+		case 0:
+			tok = Token{Type: TokenEOF, Literal: ""}
+			tokens = append(tokens, tok)
+			return tokens, nil
+		default:
+			if isLetter(l.ch) {
+
+			}
 		}
 	}
 }
@@ -156,4 +164,8 @@ func (l *Lexer) readUnicode() (rune, error) {
 
 func isHexDigit(ch byte) bool {
 	return ('0' <= ch && ch <= '9') || ('a' <= ch && ch <= 'f') || ('A' <= ch && ch <= 'F')
+}
+
+func isLetter(ch byte) bool {
+	return ('a' <= ch && ch <= 'z') || ('A' <= ch && ch <= 'Z') || ch == '_'
 }

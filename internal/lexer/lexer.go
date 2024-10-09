@@ -79,6 +79,18 @@ func (l *Lexer) Tokenize() ([]Token, error) {
 		default:
 			if isLetter(l.ch) {
 				literal := l.readLiteral()
+				switch literal {
+				case "true":
+					tok = Token{Type: TokenTrue, Literal: literal}
+				case "false":
+					tok = Token{Type: TokenFalse, Literal: literal}
+				case "null":
+					tok = Token{Type: TokenNull, Literal: literal}
+				default:
+					return nil, NewUnexpectedCharacterError(l.ch)
+				}
+			} else if isDigit(l.ch) || l.ch == '-' {
+
 			}
 		}
 	}
@@ -174,3 +186,39 @@ func isDigit(ch byte) bool {
 	return '0' <= ch && ch <= '9'
 }
 
+func (l *Lexer) readLiteral() string {
+	position := l.position
+	for isLetter(l.ch) || isDigit(l.ch) {
+		l.readChar()
+	}
+
+	// Return the literal by slicing the input string from the starting position to the current position
+	return l.input[position:l.position]
+}
+
+func (l *Lexer) readNumber() string {
+	position := l.position
+
+	// Check for a leading minus sign(-).
+	if l.ch == '-' {
+		l.readChar() // Move past the minus sign.
+	}
+
+	// Read through all digits before the decimal point.
+	for isDigit(l.ch) {
+		l.readChar()
+	}
+
+	// If there is a decimal point, read the fractional part.
+	if l.ch == '.' {
+		l.readChar() // Move past the decimal point.
+
+		// Read through digits after the decimal point
+		for isDigit(l.ch) {
+			l.readChar()
+		}
+	}
+
+	// Return the full number as a string.
+	return l.input[position:l.position]
+}

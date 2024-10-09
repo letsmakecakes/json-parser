@@ -10,16 +10,18 @@ import (
 type TokenType string
 
 const (
-	TokenLeftBrace  TokenType = "{"
-	TokenRightBrace TokenType = "}"
-	TokenColon      TokenType = ":"
-	TokenComma      TokenType = ","
-	TokenString     TokenType = "STRING"
-	TokenNumber     TokenType = "NUMBER"
-	TokenTrue       TokenType = "TRUE"
-	TokenFalse      TokenType = "FALSE"
-	TokenNull       TokenType = "NULL"
-	TokenEOF        TokenType = "EOF"
+	TokenLeftBrace    TokenType = "{"
+	TokenRightBrace   TokenType = "}"
+	TokenLeftBracket  TokenType = "["
+	TokenRightBracket TokenType = "]"
+	TokenColon        TokenType = ":"
+	TokenComma        TokenType = ","
+	TokenString       TokenType = "STRING"
+	TokenNumber       TokenType = "NUMBER"
+	TokenTrue         TokenType = "TRUE"
+	TokenFalse        TokenType = "FALSE"
+	TokenNull         TokenType = "NULL"
+	TokenEOF          TokenType = "EOF"
 )
 
 type Token struct {
@@ -54,7 +56,7 @@ func (l *Lexer) Tokenize() ([]Token, error) {
 	var tokens []Token
 
 	for {
-		l.skipWhiteSpace()
+		l.skipWhitespace()
 		var tok Token
 
 		switch l.ch {
@@ -62,6 +64,10 @@ func (l *Lexer) Tokenize() ([]Token, error) {
 			tok = Token{Type: TokenLeftBrace, Literal: "{"}
 		case '}':
 			tok = Token{Type: TokenRightBrace, Literal: "}"}
+		case '[':
+			tok = Token{Type: TokenLeftBracket, Literal: "["}
+		case ']':
+			tok = Token{Type: TokenRightBracket, Literal: "]"}
 		case ':':
 			tok = Token{Type: TokenColon, Literal: ":"}
 		case ',':
@@ -74,10 +80,6 @@ func (l *Lexer) Tokenize() ([]Token, error) {
 			tok = Token{Type: TokenString, Literal: str}
 			tokens = append(tokens, tok)
 			continue
-		case 0:
-			tok = Token{Type: TokenEOF, Literal: ""}
-			tokens = append(tokens, tok)
-			return tokens, nil
 		case 't':
 			if l.peekWord(4) == "true" {
 				tok = Token{Type: TokenTrue, Literal: "true"}
@@ -99,6 +101,10 @@ func (l *Lexer) Tokenize() ([]Token, error) {
 			} else {
 				return nil, NewUnexpectedCharacterError(l.ch)
 			}
+		case 0:
+			tok = Token{Type: TokenEOF, Literal: ""}
+			tokens = append(tokens, tok)
+			return tokens, nil
 		default:
 			if isDigit(l.ch) || l.ch == '-' {
 				num := l.readNumber()
@@ -113,7 +119,7 @@ func (l *Lexer) Tokenize() ([]Token, error) {
 	}
 }
 
-func (l *Lexer) skipWhiteSpace() {
+func (l *Lexer) skipWhitespace() {
 	for isWhiteSpace(l.ch) {
 		l.readChar()
 	}
@@ -227,22 +233,8 @@ func isHexDigit(ch byte) bool {
 	return ('0' <= ch && ch <= '9') || ('a' <= ch && ch <= 'f') || ('A' <= ch && ch <= 'F')
 }
 
-func isLetter(ch byte) bool {
-	return ('a' <= ch && ch <= 'z') || ('A' <= ch && ch <= 'Z') || ch == '_'
-}
-
 func isDigit(ch byte) bool {
 	return '0' <= ch && ch <= '9'
-}
-
-func (l *Lexer) readLiteral() string {
-	position := l.position
-	for isLetter(l.ch) || isDigit(l.ch) {
-		l.readChar()
-	}
-
-	// Return the literal by slicing the input string from the starting position to the current position
-	return l.input[position:l.position]
 }
 
 func (l *Lexer) readNumber() string {

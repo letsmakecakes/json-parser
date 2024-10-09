@@ -72,8 +72,6 @@ func (l *Lexer) Tokenize() ([]Token, error) {
 			tok = Token{Type: TokenString, Literal: str}
 			tokens = append(tokens, tok)
 			continue
-		case 0:
-			tok
 		}
 	}
 }
@@ -121,8 +119,19 @@ func (l *Lexer) readString() (string, error) {
 			case 'u':
 				// Handle Unicode escape sequences (e.g., \uXXXX)
 				unicodeChar, err := l.readUnicode()
+				if err != nil {
+					return "", err
+				}
+				strBuilder.WriteByte(byte(unicodeChar))
+			default:
+				return "", NewUnexpectedCharacterError(l.ch)
 			}
+		case 0: // End of input, but no closing quote found
+			return "", fmt.Errorf("unterminated string")
+		default:
+			strBuilder.WriteByte(l.ch)
 		}
+		l.readChar() // Read the next character
 	}
 }
 

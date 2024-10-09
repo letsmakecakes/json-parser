@@ -1,6 +1,9 @@
 package lexer
 
-import "testing"
+import (
+	"reflect"
+	"testing"
+)
 
 func TestLexer_Tokenize_ValidEmptyObject(t *testing.T) {
 	input := "{}"
@@ -18,5 +21,24 @@ func TestLexer_Tokenize_ValidEmptyObject(t *testing.T) {
 
 	if len(tokens) != len(expected) {
 		t.Fatalf("expected %d tokens, got %d", len(expected), len(tokens))
+	}
+}
+
+func TestLexer_SimpleStrings(t *testing.T) {
+	input := `"hello" "world"`
+	expectedTokens := []Token{
+		{Type: TokenString, Literal: "hello"},
+		{Type: TokenString, Literal: "world"},
+		{Type: TokenEOF, Literal: ""},
+	}
+
+	lexer := NewLexer(input)
+	tokens, err := lexer.Tokenize()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !reflect.DeepEqual(tokens, expectedTokens) {
+		t.Errorf("expected tokens %v, got %v", expectedTokens, tokens)
 	}
 }

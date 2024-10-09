@@ -42,3 +42,22 @@ func TestLexer_SimpleStrings(t *testing.T) {
 		t.Errorf("expected tokens %v, got %v", expectedTokens, tokens)
 	}
 }
+
+func TestLexer_StringsWithEscapes(t *testing.T) {
+	input := `"hello\nworld" "escaped \"quote\""`
+	expectedTokens := []Token{
+		{Type: TokenString, Literal: "hello\nworld"},
+		{Type: TokenString, Literal: `escaped "quote"`},
+		{Type: TokenEOF, Literal: ""},
+	}
+
+	lexer := NewLexer(input)
+	tokens, err := lexer.Tokenize()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !reflect.DeepEqual(tokens, expectedTokens) {
+		t.Errorf("expected tokens %v, got %v", expectedTokens, tokens)
+	}
+}

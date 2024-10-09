@@ -61,3 +61,23 @@ func TestLexer_StringsWithEscapes(t *testing.T) {
 		t.Errorf("expected tokens %v, got %v", expectedTokens, tokens)
 	}
 }
+
+func TestLexer_UnicodeStrings(t *testing.T) {
+	input := `"unicode \u0041" "emoji \u1F600"`
+	expectedTokens := []Token{
+		{Type: TokenString, Literal: "unicode A"},
+		{Type: TokenString, Literal: "emoji 😀"}, // \u1F600 is 😀
+		{Type: TokenEOF, Literal: ""},
+	}
+
+	lexer := NewLexer(input)
+	tokens, err := lexer.Tokenize()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Note: Ensure your readUnicode method correctly parses \u1F600
+	if !reflect.DeepEqual(tokens, expectedTokens) {
+		t.Errorf("expected tokens %v, got %v", expectedTokens, tokens)
+	}
+}

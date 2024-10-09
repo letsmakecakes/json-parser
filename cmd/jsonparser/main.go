@@ -3,8 +3,9 @@ package main
 import (
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"os"
+
+	"github.com/letsmakecakes/jsonparser/internal/lexer"
 )
 
 func main() {
@@ -16,13 +17,18 @@ func main() {
 		os.Exit(1)
 	}
 
-	data, err := ioutil.ReadFile(*filepath)
+	data, err := os.ReadFile(*filepath)
 	if err != nil {
 		fmt.Println("Error reading file:", err)
 		os.Exit(1)
 	}
 
-	// TODO: Call lexer
+	lex := lexer.NewLexer(string(data))
+	tokens, lexErr := lex.Tokenize()
+	if lexErr != nil {
+		fmt.Println("Lexing Error:", lexErr)
+		os.Exit(1)
+	}
 
 	// TODO: call Parser
 }

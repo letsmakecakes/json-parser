@@ -272,3 +272,12 @@ func isHighSurrogate(r rune) bool {
 func isLowSurrogate(r rune) bool {
 	return r >= 0xDC00 && r <= 0xDFFF
 }
+
+func (l *Lexer) peekWord(n int) string {
+	end := l.readPosition + n - 1
+	if end > len(l.input) {
+		end = len(l.input)
+	}
+
+	return l.input[l.position:end]
+}

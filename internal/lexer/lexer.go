@@ -90,9 +90,15 @@ func (l *Lexer) Tokenize() ([]Token, error) {
 					return nil, NewUnexpectedCharacterError(l.ch)
 				}
 			} else if isDigit(l.ch) || l.ch == '-' {
-
+				num := l.readNumber()
+				tok = Token{Type: TokenNumber, Literal: num}
+			} else {
+				return nil, NewUnexpectedCharacterError(l.ch)
 			}
 		}
+
+		tokens = append(tokens, tok)
+		l.readChar()
 	}
 }
 

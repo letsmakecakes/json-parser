@@ -3,6 +3,8 @@ package lexer
 import (
 	"fmt"
 	"strings"
+	"unicode/utf16"
+	"unicode/utf8"
 )
 
 type TokenType string
@@ -144,11 +146,43 @@ func (l *Lexer) readString() (string, error) {
 				strBuilder.WriteByte('\t')
 			case 'u':
 				// Handle Unicode escape sequences (e.g., \uXXXX)
-				unicodeChar, err := l.readUnicode()
+				runeValue, err := l.readUnicode()
 				if err != nil {
 					return "", err
 				}
-				strBuilder.WriteByte(byte(unicodeChar))
+
+				// Check if the rune is a high surrogate
+				if isHighSurrogate(runeValue) {
+					// Expecting a low surrogate next
+					if l.ch != '\\' {
+						return "", fmt.Errorf("expected `\\' after high surrogate, got '%c'", l.ch)
+					}
+					l.readChar() // Skip the backslash
+					if l.ch != 'u' {
+						return "", fmt.Errorf("expected 'u' after '\\', got '%c'", l.ch)
+					}
+					l.readChar() // Skip the 'u'
+
+					lowSurrogate, err := l.readUnicode()
+					if err != nil {
+						return "", err
+					}
+
+					if !isLowSurrogate(lowSurrogate) {
+						return "", fmt.Errorf("invalid low surrogate: \\u%04X", lowSurrogate)
+					}
+
+					// Combine the surrogate pair into a single rune
+					combinedRune := utf16.DecodeRune(runeValue, lowSurrogate)
+					if combinedRune == utf8.RuneError {
+						return "", fmt.Errorf("invalid surrogate pair: \\u%04X\\u%04X", runeValue, lowSurrogate)
+					}
+
+					strBuilder.WriteRune(combinedRune)
+				} else {
+					// Regular Unicode character
+					strBuilder.WriteByte(byte(runeValue))
+				}
 			default:
 				return "", NewUnexpectedCharacterError(l.ch)
 			}
@@ -171,13 +205,13 @@ func (l *Lexer) readUnicode() (rune, error) {
 		hex += string(l.ch)
 	}
 
-	var unicodeValue rune
+	var unicodeValue uint32
 	_, err := fmt.Sscanf(hex, "%04x", &unicodeValue)
 	if err != nil {
 		return 0, fmt.Errorf("invalid Unicode escape sequence")
 	}
 
-	return unicodeValue, nil
+	return rune(unicodeValue), nil
 }
 
 func isHexDigit(ch byte) bool {
@@ -227,4 +261,14 @@ func (l *Lexer) readNumber() string {
 
 	// Return the full number as a string.
 	return l.input[position:l.position]
+}
+
+// isHighSurrogate checks if a rune is a high surrogate.
+func isHighSurrogate(r rune) bool {
+	return r >= 0xD800 && r <= 0xDBFF
+}
+
+// isLowSurrogate checks if a rune is a low surrogate.
+func isLowSurrogate(r rune) bool {
+	return r >= 0xDC00 && r <= 0xDFFF
 }

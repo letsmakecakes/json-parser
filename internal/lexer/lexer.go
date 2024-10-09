@@ -78,7 +78,7 @@ func (l *Lexer) Tokenize() ([]Token, error) {
 			return tokens, nil
 		default:
 			if isLetter(l.ch) {
-
+				literal := l.readLiteral()
 			}
 		}
 	}
@@ -169,3 +169,8 @@ func isHexDigit(ch byte) bool {
 func isLetter(ch byte) bool {
 	return ('a' <= ch && ch <= 'z') || ('A' <= ch && ch <= 'Z') || ch == '_'
 }
+
+func isDigit(ch byte) bool {
+	return '0' <= ch && ch <= '9'
+}
+

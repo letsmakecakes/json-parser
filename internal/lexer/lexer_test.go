@@ -81,3 +81,24 @@ func TestLexer_UnicodeStrings(t *testing.T) {
 		t.Errorf("expected tokens %v, got %v", expectedTokens, tokens)
 	}
 }
+
+func TestLexer_Numbers(t *testing.T) {
+	input := `123 -456 78.90 -0.12`
+	expectedTokens := []Token{
+		{Type: TokenNumber, Literal: "123"},
+		{Type: TokenNumber, Literal: "-456"},
+		{Type: TokenNumber, Literal: "78.90"},
+		{Type: TokenNumber, Literal: "-0.12"},
+		{Type: TokenEOF, Literal: ""},
+	}
+
+	lexer := NewLexer(input)
+	tokens, err := lexer.Tokenize()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !reflect.DeepEqual(tokens, expectedTokens) {
+		t.Errorf("expected tokens %v, got %v", expectedTokens, tokens)
+	}
+}

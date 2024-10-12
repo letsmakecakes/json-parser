@@ -65,6 +65,10 @@ func (p *Parser) nextToken() {
 	p.current = p.current + 1
 }
 
+func (p *Parser) peekTypeIs(tokenType lexer.TokenType) bool {
+	return p.tokens[p.current].Type == tokenType
+}
+
 func (p *Parser) parseValue() (ast.Value, error) {
 	tok := p.peek()
 	switch tok.Type {

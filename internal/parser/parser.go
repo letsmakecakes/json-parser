@@ -67,9 +67,42 @@ func (p *Parser) parseValue() (ast.Value, error) {
 		return &ast.Null{}, nil
 	case lexer.TokenLeftBrace:
 		return p.parseObject()
-	case lexer.TokenLeftBrace:
+	case lexer.TokenLeftBracket:
 		return p.parseArray()
 	default:
 		return nil, lexer.NewUnexpectedTokenError(tok, "a valid value")
 	}
+}
+
+func (p *Parser) parseArray() (*ast.Array, error) {
+	array := &ast.Array{}
+
+	p.nextToken() // skip the opening bracket
+
+	// Handle empty array case
+	if p.peekTypeIs(lexer.TokenRightBracket) {
+		p.nextToken() // consume the closing bracket
+		return array, nil
+	}
+
+	for !p.peekTypeIs(lexer.TokenRightBracket) && !p.peekTypeIs(lexer.TokenEOF) {
+		value, err := p.parseValue()
+		if err != nil {
+			return nil, err
+		}
+
+		array.Elements = append(array.Elements, value)
+
+		if p.peekTypeIs(lexer.TokenComma) {
+			p.nextToken() // skip the comma
+		} else {
+			break
+		}
+	}
+
+	if !p.expectCurrent(lexer.TokenRightBracket) {
+		return nil, lexer.NewUnexpectedTokenError(p.peek(), lexer.TokenRightBracket)
+	}
+
+	return nil, nil
 }

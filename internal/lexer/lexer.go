@@ -44,7 +44,7 @@ func NewLexer(input string) *Lexer {
 
 func (l *Lexer) readChar() {
 	if l.readPosition >= len(l.input) {
-		l.ch = 0
+		l.ch = 0 // EOF
 	} else {
 		l.ch = l.input[l.readPosition]
 	}
@@ -52,11 +52,30 @@ func (l *Lexer) readChar() {
 	l.readPosition++
 }
 
+func (l *Lexer) skipWhitespace() {
+	for isWhitespace(l.ch) {
+		l.readChar()
+	}
+}
+
+func isWhitespace(ch byte) bool {
+	return ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r'
+}
+
+func isHighSurrogate(r rune) bool {
+	return r >= 0xD800 && r <= 0xDBFF
+}
+
+func isLowSurrogate(r rune) bool {
+	return r >= 0xDC00 && r <= 0xDFFF
+}
+
 func (l *Lexer) Tokenize() ([]Token, error) {
 	var tokens []Token
 
 	for {
-		l.skipWhitespace()
+		l.skipWhitespace() // Skip any whitespace characters
+
 		var tok Token
 
 		switch l.ch {
@@ -71,7 +90,7 @@ func (l *Lexer) Tokenize() ([]Token, error) {
 		case ':':
 			tok = Token{Type: TokenColon, Literal: ":"}
 		case ',':
-			tok = Token{Type: TokenComma, Literal: ","}
+			tok = Token{Type: TokenComma, Literal: ","} // Create token for comma
 		case '"':
 			str, err := l.readString()
 			if err != nil {
@@ -101,32 +120,29 @@ func (l *Lexer) Tokenize() ([]Token, error) {
 			} else {
 				return nil, NewUnexpectedCharacterError(l.ch)
 			}
-		case 0:
+		case 0: // End of input
 			tok = Token{Type: TokenEOF, Literal: ""}
 			tokens = append(tokens, tok)
 			return tokens, nil
 		default:
 			if isDigit(l.ch) || l.ch == '-' {
-				num := l.readNumber()
+				num, err := l.readNumber()
+				if err != nil {
+					return nil, err
+				}
 				tok = Token{Type: TokenNumber, Literal: num}
 			} else {
 				return nil, NewUnexpectedCharacterError(l.ch)
 			}
 		}
 
-		tokens = append(tokens, tok)
-		l.readChar()
+		tokens = append(tokens, tok) // Append the created token to the tokens slice
+		l.readChar()                 // Move to the next character for the next iteration
 	}
-}
+} 
 
-func (l *Lexer) skipWhitespace() {
-	for isWhiteSpace(l.ch) {
-		l.readChar()
-	}
-}
-
-func isWhiteSpace(ch byte) bool {
-	return ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r'
+func isDigit(ch byte) bool {
+	return '0' <= ch && ch <= '9'
 }
 
 func (l *Lexer) readString() (string, error) {
@@ -141,7 +157,7 @@ func (l *Lexer) readString() (string, error) {
 			l.readChar() // Move past the closing quote
 			return strBuilder.String(), nil
 		case '\\': // Handle escape sequences
-			l.readChar() // Move past the backlash
+			l.readChar() // Move past the backslash
 			switch l.ch {
 			case '"':
 				strBuilder.WriteByte('"')
@@ -170,7 +186,7 @@ func (l *Lexer) readString() (string, error) {
 				if isHighSurrogate(runeValue) {
 					// Expecting a low surrogate next
 					if l.ch != '\\' {
-						return "", fmt.Errorf("expected `\\' after high surrogate, got '%c'", l.ch)
+						return "", fmt.Errorf("expected '\\' after high surrogate, got '%c'", l.ch)
 					}
 					l.readChar() // Skip the backslash
 					if l.ch != 'u' {
@@ -196,16 +212,17 @@ func (l *Lexer) readString() (string, error) {
 					strBuilder.WriteRune(combinedRune)
 				} else {
 					// Regular Unicode character
-					strBuilder.WriteByte(byte(runeValue))
+					strBuilder.WriteRune(runeValue)
 				}
 			default:
-				return "", NewUnexpectedCharacterError(l.ch)
+				return "", fmt.Errorf("unexpected character: '%c' in string escape", l.ch)
 			}
 		case 0: // End of input, but no closing quote found
 			return "", fmt.Errorf("unterminated string")
 		default:
 			strBuilder.WriteByte(l.ch)
 		}
+
 		l.readChar() // Read the next character
 	}
 }
@@ -213,17 +230,17 @@ func (l *Lexer) readString() (string, error) {
 func (l *Lexer) readUnicode() (rune, error) {
 	var hex string
 	for i := 0; i < 4; i++ {
-		l.readChar()
 		if !isHexDigit(l.ch) {
-			return 0, fmt.Errorf("invalid Unicode escpae sequence")
+			return 0, fmt.Errorf("invalid Unicode escape sequence: \\u%s", hex)
 		}
 		hex += string(l.ch)
+		l.readChar()
 	}
 
 	var unicodeValue uint32
 	_, err := fmt.Sscanf(hex, "%04x", &unicodeValue)
 	if err != nil {
-		return 0, fmt.Errorf("invalid Unicode escape sequence")
+		return 0, fmt.Errorf("invalid Unicode escape sequence: \\u%s", hex)
 	}
 
 	return rune(unicodeValue), nil
@@ -233,45 +250,33 @@ func isHexDigit(ch byte) bool {
 	return ('0' <= ch && ch <= '9') || ('a' <= ch && ch <= 'f') || ('A' <= ch && ch <= 'F')
 }
 
-func isDigit(ch byte) bool {
-	return '0' <= ch && ch <= '9'
-}
-
-func (l *Lexer) readNumber() string {
+func (l *Lexer) readNumber() (string, error) {
 	position := l.position
 
-	// Check for a leading minus sign(-).
 	if l.ch == '-' {
-		l.readChar() // Move past the minus sign.
-	}
-
-	// Read through all digits before the decimal point.
-	for isDigit(l.ch) {
 		l.readChar()
 	}
 
-	// If there is a decimal point, read the fractional part.
-	if l.ch == '.' {
-		l.readChar() // Move past the decimal point.
+	hasDigits := false
+	for isDigit(l.ch) {
+		hasDigits = true
+		l.readChar()
+	}
 
-		// Read through digits after the decimal point
+	if l.ch == '.' {
+		l.readChar()
+
 		for isDigit(l.ch) {
+			hasDigits = true
 			l.readChar()
 		}
 	}
 
-	// Return the full number as a string.
-	return l.input[position:l.position]
-}
+	if !hasDigits {
+		return "", fmt.Errorf("invalid number format")
+	}
 
-// isHighSurrogate checks if a rune is a high surrogate.
-func isHighSurrogate(r rune) bool {
-	return r >= 0xD800 && r <= 0xDBFF
-}
-
-// isLowSurrogate checks if a rune is a low surrogate.
-func isLowSurrogate(r rune) bool {
-	return r >= 0xDC00 && r <= 0xDFFF
+	return l.input[position:l.position], nil
 }
 
 func (l *Lexer) peekWord(n int) string {
@@ -279,7 +284,6 @@ func (l *Lexer) peekWord(n int) string {
 	if end > len(l.input) {
 		end = len(l.input)
 	}
-
 	return l.input[l.position:end]
 }
 

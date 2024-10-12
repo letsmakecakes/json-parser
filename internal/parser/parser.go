@@ -14,7 +14,7 @@ func (p *Parser) parseObject() (*ast.Object, error) {
 	obj := &ast.Object{}
 
 	if !p.expectCurrent(lexer.TokenLeftBrace) {
-		return nil, errors.NewUnexpectedCharacterError(p.peek(), lexer.TokenLeftBrace)
+		return nil, lexer.NewUnexpectedTokenError(p.peek(), lexer.TokenLeftBrace)
 	}
 
 	p.nextToken()
@@ -53,6 +53,14 @@ func (p *Parser) parseObject() (*ast.Object, error) {
 	return obj, nil
 }
 
+func (p *Parser) expectCurrent(tokenType lexer.TokenType) bool {
+	return p.tokens[p.current].Type == tokenType
+}
+
+func (p *Parser) peek() lexer.Token {
+	return p.tokens[p.current]
+}
+
 func (p *Parser) parseValue() (ast.Value, error) {
 	tok := p.peek()
 	switch tok.Type {
@@ -72,10 +80,6 @@ func (p *Parser) parseValue() (ast.Value, error) {
 	default:
 		return nil, lexer.NewUnexpectedTokenError(tok, "a valid value")
 	}
-}
-
-func (p *Parser) expectCurrent(tokenType lexer.TokenType) bool {
-	return p.tokens[p.current].Type == tokenType
 }
 
 func (p *Parser) parseArray() (*ast.Array, error) {

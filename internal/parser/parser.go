@@ -74,6 +74,10 @@ func (p *Parser) parseValue() (ast.Value, error) {
 	}
 }
 
+func (p *Parser) expectCurrent(tokenType lexer.TokenType) bool {
+	return p.tokens[p.current].Type == tokenType
+}
+
 func (p *Parser) parseArray() (*ast.Array, error) {
 	array := &ast.Array{}
 

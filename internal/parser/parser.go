@@ -52,3 +52,24 @@ func (p *Parser) parseObject() (*ast.Object, error) {
 
 	return obj, nil
 }
+
+func (p *Parser) parseValue() (ast.Value, error) {
+	tok := p.peek()
+	switch tok.Type {
+	case lexer.TokenString:
+		p.nextToken()
+		return &ast.String{Value: tok.Literal}, nil
+	case lexer.TokenNumber:
+		p.nextToken()
+		return &ast.Number{Value: tok.Literal}, nil
+	case lexer.TokenNull:
+		p.nextToken()
+		return &ast.Null{}, nil
+	case lexer.TokenLeftBrace:
+		return p.parseObject()
+	case lexer.TokenLeftBrace:
+		return p.parseArray()
+	default:
+		return nil, lexer.NewUnexpectedTokenError(tok, "a valid value")
+	}
+}

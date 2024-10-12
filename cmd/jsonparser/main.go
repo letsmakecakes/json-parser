@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/letsmakecakes/jsonparser/internal/lexer"
+	"github.com/letsmakecakes/jsonparser/internal/parser"
 )
 
 func main() {
@@ -30,5 +31,12 @@ func main() {
 		os.Exit(1)
 	}
 
-	// TODO: call Parser
+	_, parseErr := parser.Parse(tokens)
+	if parseErr != nil {
+		fmt.Println("Parsing Error:", parseErr)
+		os.Exit(1)
+	}
+
+	fmt.Println("Valid JSON")
+	os.Exit(0)
 }

@@ -10,6 +10,11 @@ type Parser struct {
 	current int
 }
 
+func Parse(tokens []lexer.Token) (*ast.Object, error) {
+	p := &Parser{tokens: tokens, current: 0}
+	return p.parseObject()
+}
+
 func (p *Parser) parseObject() (*ast.Object, error) {
 	obj := &ast.Object{}
 
@@ -27,7 +32,7 @@ func (p *Parser) parseObject() (*ast.Object, error) {
 		key := keyToken.Literal
 		p.nextToken()
 
-		if !p.expectedCurrent(lexer.TokenColon) {
+		if !p.expectCurrent(lexer.TokenColon) {
 			return nil, lexer.NewUnexpectedTokenError(p.peek(), lexer.TokenColon)
 		}
 		p.nextToken()

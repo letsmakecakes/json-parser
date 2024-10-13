@@ -91,18 +91,7 @@ func (l *Lexer) skipWhitespace() {
 	}
 }
 
-func isWhitespace(ch byte) bool {
-	return ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r'
-}
-
-func isHighSurrogate(r rune) bool {
-	return r >= 0xD800 && r <= 0xDBFF
-}
-
-func isLowSurrogate(r rune) bool {
-	return r >= 0xDC00 && r <= 0xDFFF
-}
-
+// Tokenize converts the input string into a slice of Tokens
 func (l *Lexer) Tokenize() ([]Token, error) {
 	var tokens []Token
 
@@ -173,6 +162,16 @@ func (l *Lexer) Tokenize() ([]Token, error) {
 		l.readChar()                 // Move to the next character for the next iteration
 	}
 }
+
+func isHighSurrogate(r rune) bool {
+	return r >= 0xD800 && r <= 0xDBFF
+}
+
+func isLowSurrogate(r rune) bool {
+	return r >= 0xDC00 && r <= 0xDFFF
+}
+
+
 
 func isDigit(ch byte) bool {
 	return '0' <= ch && ch <= '9'

@@ -95,72 +95,75 @@ func (l *Lexer) skipWhitespace() {
 func (l *Lexer) Tokenize() ([]Token, error) {
 	var tokens []Token
 
-	for {
+	for l.ch != 0 {
 		l.skipWhitespace() // Skip any whitespace characters
 
 		var tok Token
+		tok.Line = l.line
+		tok.Column = l.column
 
 		switch l.ch {
 		case '{':
-			tok = Token{Type: TokenLeftBrace, Literal: "{"}
+			tok = Token{Type: TokenLeftBrace, Literal: "{", Line: l.line, Column: l.column}
 		case '}':
-			tok = Token{Type: TokenRightBrace, Literal: "}"}
+			tok = Token{Type: TokenRightBrace, Literal: "}", Line: l.line, Column: l.column}
 		case '[':
-			tok = Token{Type: TokenLeftBracket, Literal: "["}
+			tok = Token{Type: TokenLeftBracket, Literal: "[", Line: l.line, Column: l.column}
 		case ']':
-			tok = Token{Type: TokenRightBracket, Literal: "]"}
+			tok = Token{Type: TokenRightBracket, Literal: "]", Line: l.line, Column: l.column}
 		case ':':
-			tok = Token{Type: TokenColon, Literal: ":"}
+			tok = Token{Type: TokenColon, Literal: ":", Line: l.line, Column: l.column}
 		case ',':
-			tok = Token{Type: TokenComma, Literal: ","} // Create token for comma
+			tok = Token{Type: TokenComma, Literal: ",", Line: l.line, Column: l.column} // Create token for comma
 		case '"':
 			str, err := l.readString()
 			if err != nil {
 				return nil, err
 			}
-			tok = Token{Type: TokenString, Literal: str}
+			tok = Token{Type: TokenString, Literal: str, Line: l.line, Column: l.column}
 			tokens = append(tokens, tok)
 			continue
 		case 't':
-			if l.peekWord(4) == "true" {
-				tok = Token{Type: TokenTrue, Literal: "true"}
-				l.advanceBy(4)
+			if l.peekKeyWord("true") {
+				tok = Token{Type: TokenTrue, Literal: "true", Line: l.line, Column: l.column}
+				l.advanceBy(len("true"))
 			} else {
-				return nil, NewUnexpectedCharacterError(l.ch)
+				return nil, fmt.Errorf("invalid token starting with 't'")
 			}
 		case 'f':
-			if l.peekWord(5) == "false" {
-				tok = Token{Type: TokenFalse, Literal: "false"}
-				l.advanceBy(5)
+			if l.peeKeykWord("false") {
+				tok = Token{Type: TokenFalse, Literal: "false", Line: l.line, Column: l.column}
+				l.advanceBy(len("false"))
 			} else {
-				return nil, NewUnexpectedCharacterError(l.ch)
+				return nil, fmt.Errorf("invalid token starting with 'f'")
 			}
 		case 'n':
-			if l.peekWord(4) == "null" {
-				tok = Token{Type: TokenNull, Literal: "null"}
-				l.advanceBy(4)
+			if l.peekKeyWord("null") {
+				tok = Token{Type: TokenNull, Literal: "null", Line: l.line, Column: l.column}
+				l.advanceBy(len("null"))
 			} else {
-				return nil, NewUnexpectedCharacterError(l.ch)
+				return nil, fmt.Errorf("invalid token starting with 'n'")
 			}
-		case 0: // End of input
-			tok = Token{Type: TokenEOF, Literal: ""}
-			tokens = append(tokens, tok)
-			return tokens, nil
 		default:
-			if isDigit(l.ch) || l.ch == '-' {
+			if l.isStartOfNumber(l.ch) {
 				num, err := l.readNumber()
 				if err != nil {
 					return nil, err
 				}
-				tok = Token{Type: TokenNumber, Literal: num}
+				tok = Token{Type: TokenNumber, Literal: num, Line: l.line, Column: l.column}
 			} else {
-				return nil, NewUnexpectedCharacterError(l.ch)
+				return nil, fmt.Errorf("unexpected character: %c", l.ch)
 			}
 		}
 
 		tokens = append(tokens, tok) // Append the created token to the tokens slice
 		l.readChar()                 // Move to the next character for the next iteration
 	}
+
+	// Append EOF token
+	tokens = append(tokens, Token{Type: TokenEOF, Literal: "", Line: l.line, Column: l.column})
+
+	return tokens, nil
 }
 
 func isHighSurrogate(r rune) bool {
@@ -170,8 +173,6 @@ func isHighSurrogate(r rune) bool {
 func isLowSurrogate(r rune) bool {
 	return r >= 0xDC00 && r <= 0xDFFF
 }
-
-
 
 func isDigit(ch byte) bool {
 	return '0' <= ch && ch <= '9'

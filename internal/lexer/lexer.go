@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"strings"
 	"unicode"
+	"unicode/utf16"
 	"unicode/utf8"
 )
 
@@ -341,35 +342,116 @@ func (l *Lexer) readString() (string, error) {
 	return strBuilder.String(), nil
 }
 
+// readUnicode reads a Unicode escape sequence and returns the corresponding rune
 func (l *Lexer) readUnicode() (rune, error) {
-	var hex string
+	var hexDigits [4]rune
 	for i := 0; i < 4; i++ {
-		if !isHexDigit(l.ch) {
-			return 0, fmt.Errorf("invalid Unicode escape sequence: \\u%s", hex)
-		}
-		hex += string(l.ch)
 		l.readChar()
+		if !isHexDigit(l.ch) {
+			return 0, fmt.Errorf("invalid unicode escape sequence")
+		}
+		hexDigits[i] = l.ch
 	}
 
-	var unicodeValue uint32
-	_, err := fmt.Sscanf(hex, "%04x", &unicodeValue)
-	if err != nil {
-		return 0, fmt.Errorf("invalid Unicode escape sequence: \\u%s", hex)
+	codePoint := hexToInt(hexDigits)
+	r := rune(codePoint)
+
+	if unicode.IsSurrogate(r) {
+		if !l.peekUnicodeSurrogatePair() {
+			return 0, fmt.Errorf("invalid surrogate pair in Unicode escape")
+		}
+		// Read the low surrogate
+		l.readChar() // Skip 'u'
+		l.readChar() // Move to low surrogate
+		lexHexDigits, err := l.readUnicodeSurrogate()
+		if err != nil {
+			return 0, err
+		}
+		r = utf16.DecodeRune(r, lexHexDigits)
+		if r == utf8.RuneError {
+			return 0, fmt.Errorf("invalid surrogate pair")
+		}
 	}
 
-	return rune(unicodeValue), nil
+	return r, nil
 }
 
-func isHighSurrogate(r rune) bool {
-	return r >= 0xD800 && r <= 0xDBFF
+// peekUnicodeSurrogatePair checks if the next sequence is a low surrogate pair
+func (l *Lexer) peekUnicodeSurrogatePair() bool {
+	backupPosition := l.readPosition
+	backupLine := l.line
+	backupColumn := l.column
+
+	// Expecting '\', 'u' followed by four hex digits
+	if l.peekChar() != '\\' {
+		return false
+	}
+	l.readChar()
+	if l.peekChar() != 'u' {
+		l.readPosition = backupPosition
+		l.line = backupLine
+		l.column = backupColumn
+		return false
+	}
+	for i := 0; i < 5; i++ { // Skip '\', 'u', and four hex digits
+		l.readChar()
+		if i < 2 && (i == 0 && l.ch != '\\' || i == 1 && l.ch != 'u') {
+			l.readPosition = backupPosition
+			l.line = backupLine
+			l.column = backupColumn
+			return false
+		}
+		if i >= 2 && !isHexDigit(l.ch) {
+			l.readPosition = backupPosition
+			l.line = backupLine
+			l.column = backupColumn
+			return false
+		}
+	}
+	l.readPosition = backupPosition
+	l.line = backupLine
+	l.column = backupColumn
+	return true
 }
 
-func isLowSurrogate(r rune) bool {
-	return r >= 0xDC00 && r <= 0xDFFF
+// readUnicodeSurrogate reads the low surrogate after '\u'
+func (l *Lexer) readUnicodeSurrogate() (rune, error) {
+	var hexDigits [4]rune
+	for i := 0; i < 4; i++ {
+		l.readChar()
+		if !isHexDigit(l.ch) {
+			return 0, fmt.Errorf("invalid Unicode low surrogate escape sequence")
+		}
+		hexDigits[i] = l.ch
+	}
+
+	codePoint := hexToInt(hexDigits)
+	r := rune(codePoint)
+	if !unicode.IsLowSurrogate(r) {
+		return 0, fmt.Errorf("invalid low surrogate in Unicode escape")
+	}
+
+	return r, nil
 }
 
+// isHexDigit checks if the rune is a valid hexadecimal digit
+func isHexDigit(r rune) bool {
+	return ('0' <= r && r <= '9') || ('a' <= r && r <= 'f') || ('A' <= r && r <= 'F')
+}
 
-
-func isHexDigit(ch byte) bool {
-	return ('0' <= ch && ch <= '9') || ('a' <= ch && ch <= 'f') || ('A' <= ch && ch <= 'F')
+// hexToInt converts an array of four hex runes to an integer
+func hexToInt(hex [4]rune) int {
+	var value int
+	for _, r := range hex {
+		value <<= 4
+		switch {
+		case r >= '0' && r <= '9':
+			value += int(r - '0')
+		case r >= 'a' && r <= 'f':
+			value += int(r-'a') + 10
+		case r >= 'A' && r <= 'F':
+			value += int(r-'A') + 10
+		}
+	}
+	return value
 }

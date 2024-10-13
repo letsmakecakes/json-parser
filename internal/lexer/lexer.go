@@ -5,7 +5,6 @@ import (
 	"strconv"
 	"strings"
 	"unicode"
-	"unicode/utf16"
 	"unicode/utf8"
 )
 
@@ -293,94 +292,53 @@ func isDigitOneToNine(ch rune) bool {
 	return ch >= '1' && ch <= '9'
 }
 
-func isHighSurrogate(r rune) bool {
-	return r >= 0xD800 && r <= 0xDBFF
-}
-
-func isLowSurrogate(r rune) bool {
-	return r >= 0xDC00 && r <= 0xDFFF
-}
-
+// readString reads a string token, handling escape sequences and Unicode
 func (l *Lexer) readString() (string, error) {
 	var strBuilder strings.Builder
 
-	// Read the opening quote
-	l.readChar()
+	l.readChar() // Skip the opening quote
 
-	for {
-		switch l.ch {
-		case '"': // Closing quote found, return the string
-			l.readChar() // Move past the closing quote
-			return strBuilder.String(), nil
-		case '\\': // Handle escape sequences
-			l.readChar() // Move past the backslash
+	for l.ch != '"' && l.ch != 0 {
+		if l.ch == '\\' {
+			l.readChar()
 			switch l.ch {
 			case '"':
-				strBuilder.WriteByte('"')
+				strBuilder.WriteRune('"')
 			case '\\':
-				strBuilder.WriteByte('\\')
+				strBuilder.WriteRune('\\')
 			case '/':
-				strBuilder.WriteByte('/')
+				strBuilder.WriteRune('/')
 			case 'b':
-				strBuilder.WriteByte('\b')
+				strBuilder.WriteRune('\b')
 			case 'f':
-				strBuilder.WriteByte('\f')
+				strBuilder.WriteRune('\f')
 			case 'n':
-				strBuilder.WriteByte('\n')
+				strBuilder.WriteRune('\n')
 			case 'r':
-				strBuilder.WriteByte('\r')
+				strBuilder.WriteRune('\r')
 			case 't':
-				strBuilder.WriteByte('\t')
+				strBuilder.WriteRune('\t')
 			case 'u':
-				// Handle Unicode escape sequences (e.g., \uXXXX)
-				runeValue, err := l.readUnicode()
+				// Handle Unicode escape sequence
+				r, err := l.readUnicode()
 				if err != nil {
 					return "", err
 				}
-
-				// Check if the rune is a high surrogate
-				if isHighSurrogate(runeValue) {
-					// Expecting a low surrogate next
-					if l.ch != '\\' {
-						return "", fmt.Errorf("expected '\\' after high surrogate, got '%c'", l.ch)
-					}
-					l.readChar() // Skip the backslash
-					if l.ch != 'u' {
-						return "", fmt.Errorf("expected 'u' after '\\', got '%c'", l.ch)
-					}
-					l.readChar() // Skip the 'u'
-
-					lowSurrogate, err := l.readUnicode()
-					if err != nil {
-						return "", err
-					}
-
-					if !isLowSurrogate(lowSurrogate) {
-						return "", fmt.Errorf("invalid low surrogate: \\u%04X", lowSurrogate)
-					}
-
-					// Combine the surrogate pair into a single rune
-					combinedRune := utf16.DecodeRune(runeValue, lowSurrogate)
-					if combinedRune == utf8.RuneError {
-						return "", fmt.Errorf("invalid surrogate pair: \\u%04X\\u%04X", runeValue, lowSurrogate)
-					}
-
-					strBuilder.WriteRune(combinedRune)
-				} else {
-					// Regular Unicode character
-					strBuilder.WriteRune(runeValue)
-				}
+				strBuilder.WriteRune(r)
 			default:
-				return "", fmt.Errorf("unexpected character: '%c' in string escape", l.ch)
+				return "", fmt.Errorf("invalid escape character: '\\%c'", l.ch)
 			}
-		case 0: // End of input, but no closing quote found
-			return "", fmt.Errorf("unterminated string")
-		default:
-			strBuilder.WriteByte(l.ch)
+		} else {
+			strBuilder.WriteRune(l.ch)
 		}
-
-		l.readChar() // Read the next character
+		l.readChar()
 	}
+
+	if l.ch != '"' {
+		return "", fmt.Errorf("unterminated string literal")
+	}
+
+	return strBuilder.String(), nil
 }
 
 func (l *Lexer) readUnicode() (rune, error) {
@@ -401,6 +359,16 @@ func (l *Lexer) readUnicode() (rune, error) {
 
 	return rune(unicodeValue), nil
 }
+
+func isHighSurrogate(r rune) bool {
+	return r >= 0xD800 && r <= 0xDBFF
+}
+
+func isLowSurrogate(r rune) bool {
+	return r >= 0xDC00 && r <= 0xDFFF
+}
+
+
 
 func isHexDigit(ch byte) bool {
 	return ('0' <= ch && ch <= '9') || ('a' <= ch && ch <= 'f') || ('A' <= ch && ch <= 'F')

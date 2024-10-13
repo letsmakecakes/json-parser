@@ -7,8 +7,10 @@ import (
 	"unicode/utf8"
 )
 
+// TokenType defines the type of lexical tokens
 type TokenType string
 
+// Token types
 const (
 	TokenLeftBrace    TokenType = "{"
 	TokenRightBrace   TokenType = "}"
@@ -24,29 +26,49 @@ const (
 	TokenEOF          TokenType = "EOF"
 )
 
+// Token represents a lexical token with type and literal value
 type Token struct {
 	Type    TokenType
 	Literal string
+	Line    int // Line number in input
+	Column  int // Column number in input
 }
 
+// Lexer represents a lexical scanner
 type Lexer struct {
 	input        string
 	position     int  // current position in input (points to current char)
 	readPosition int  // current reading position in input (after current char)
-	ch           byte // current char under examination
+	ch           rune // current char under examination
+	line         int  // current line number
+	column       int  // current column number
 }
 
+// NewLexer initializes a new Lexer with the given input
 func NewLexer(input string) *Lexer {
-	l := &Lexer{input: input}
+	l := &Lexer{
+		input:  input,
+		line:   1,
+		column: 0,
+	}
 	l.readChar()
 	return l
 }
 
+// readChar reads the next character and updates positions
 func (l *Lexer) readChar() {
 	if l.readPosition >= len(l.input) {
 		l.ch = 0 // EOF
 	} else {
-		l.ch = l.input[l.readPosition]
+		r, size := utf8.DecodeLastRuneInString(l.input[l.readPosition:])
+		l.ch = r
+		l.readPosition += size
+		l.position = l.readPosition
+		l.column++
+		if l.ch == '\n' {
+			l.line++
+			l.column = 0
+		}
 	}
 	l.position = l.readPosition
 	l.readPosition++
@@ -139,7 +161,7 @@ func (l *Lexer) Tokenize() ([]Token, error) {
 		tokens = append(tokens, tok) // Append the created token to the tokens slice
 		l.readChar()                 // Move to the next character for the next iteration
 	}
-} 
+}
 
 func isDigit(ch byte) bool {
 	return '0' <= ch && ch <= '9'

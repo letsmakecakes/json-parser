@@ -131,7 +131,7 @@ func (l *Lexer) Tokenize() ([]Token, error) {
 				return nil, fmt.Errorf("Lexer error at line %d, column %d: invalid token starting with 't'", l.line, l.column)
 			}
 		case 'f':
-			if l.peeKeykWord("false") {
+			if l.peekKeyWord("false") {
 				tok = Token{Type: TokenFalse, Literal: "false", Line: l.line, Column: l.column}
 				l.advanceBy(len("false"))
 			} else {
@@ -148,7 +148,7 @@ func (l *Lexer) Tokenize() ([]Token, error) {
 			if l.isStartOfNumber(l.ch) {
 				num, err := l.readNumber()
 				if err != nil {
-					return nil, err
+					return nil, fmt.Errorf("Lexer error at line %d, column %d: %v", l.line, l.column, err)
 				}
 				tok = Token{Type: TokenNumber, Literal: num, Line: l.line, Column: l.column}
 			} else {
@@ -168,17 +168,12 @@ func (l *Lexer) Tokenize() ([]Token, error) {
 
 // peekKeyword checks if the upcoming characters match the expected keyword
 func (l *Lexer) peekKeyWord(expected string) bool {
-	for i, _ := range expected {
-		pos := l.readPosition
-		if pos+i >= len(l.input) {
-			return false
-		}
-		runeAt, _ := utf8.DecodeLastRuneInString(l.input[pos+i:])
-		if runeAt != rune(expected[i]) {
-			return false
-		}
+	end := l.readPosition + len(expected)
+	if end > len(l.input) {
+		return false
 	}
-	return true
+
+	return l.input[l.readPosition:end] == expected
 }
 
 // advanceBy advances the lexer by n characters
@@ -191,6 +186,57 @@ func (l *Lexer) advanceBy(n int) {
 // isStartOfNumber checks if the rune can start a number
 func (l *Lexer) isStartOfNumber(r rune) bool {
 	return r == '-' || unicode.IsDigit(r)
+}
+
+// readNumber reads a number token from the input, including exponents
+func (l *Lexer) readNumber() (string, error) {
+	startPos := l.position
+	hasDigits := false
+
+	// Handle optional minus sign
+	if l.ch == '-' {
+		numBuilder.WriteRune(l.ch)
+		l.readChar()
+	}
+
+	if !unicode.IsDigit(l.ch) {
+		return "", fmt.Errorf("invalid number format: expected digit after '-'")
+	}
+
+	if l.ch == '.' {
+		numBuilder.WriteRune(l.ch)
+		l.readChar()
+
+		if !unicode.IsDigit(l.ch) {
+			return "", fmt.Errorf("invalid number format: expected digit after '.'")
+		}
+
+		for unicode.IsDigit(l.ch) {
+			numBuilder.WriteRune(l.ch)
+			l.readChar()
+		}
+	}
+
+	if l.ch == 'e' || l.ch == 'E' {
+		numBuilder.WriteRune(l.ch)
+		l.readChar()
+
+		if l.ch == '+' || l.ch == '-' {
+			numBuilder.WriteRune(l.ch)
+			l.readChar()
+		}
+
+		if !unicode.IsDigit(l.ch) {
+			return "", fmt.Errorf("invalid number format: expected digit after exponent indicater")
+		}
+
+		for unicode.IsDigit(l.ch) {
+			numBuilder.WriteRune(l.ch)
+			l.readChar()
+		}
+	}
+
+	return numBuilder.String(), nil
 }
 
 func isHighSurrogate(r rune) bool {
@@ -308,33 +354,4 @@ func (l *Lexer) readUnicode() (rune, error) {
 
 func isHexDigit(ch byte) bool {
 	return ('0' <= ch && ch <= '9') || ('a' <= ch && ch <= 'f') || ('A' <= ch && ch <= 'F')
-}
-
-func (l *Lexer) readNumber() (string, error) {
-	position := l.position
-
-	if l.ch == '-' {
-		l.readChar()
-	}
-
-	hasDigits := false
-	for isDigit(l.ch) {
-		hasDigits = true
-		l.readChar()
-	}
-
-	if l.ch == '.' {
-		l.readChar()
-
-		for isDigit(l.ch) {
-			hasDigits = true
-			l.readChar()
-		}
-	}
-
-	if !hasDigits {
-		return "", fmt.Errorf("invalid number format")
-	}
-
-	return l.input[position:l.position], nil
 }

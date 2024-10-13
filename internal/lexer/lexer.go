@@ -2,6 +2,7 @@ package lexer
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"unicode"
 	"unicode/utf16"
@@ -191,57 +192,36 @@ func (l *Lexer) isStartOfNumber(r rune) bool {
 // readNumber reads a number token from the input, including exponents
 func (l *Lexer) readNumber() (string, error) {
 	startPos := l.position
-	startLine := l.line
-	startColumn := l.column
 
 	if err := l.consumeMinus(); err != nil {
 		return "", err
 	}
 
-	// Handle optional minus sign
-	if l.ch == '-' {
-		numBuilder.WriteRune(l.ch)
-		l.readChar()
+	if err := l.consumeInteger(); err != nil {
+		return "", err
 	}
 
-	if !unicode.IsDigit(l.ch) {
-		return "", fmt.Errorf("invalid number format: expected digit after '-'")
+	if err := l.consumeFraction(); err != nil {
+		return "", err
 	}
 
-	if l.ch == '.' {
-		numBuilder.WriteRune(l.ch)
-		l.readChar()
-
-		if !unicode.IsDigit(l.ch) {
-			return "", fmt.Errorf("invalid number format: expected digit after '.'")
-		}
-
-		for unicode.IsDigit(l.ch) {
-			numBuilder.WriteRune(l.ch)
-			l.readChar()
-		}
+	if err := l.consumeExponent(); err != nil {
+		return "", err
 	}
 
-	if l.ch == 'e' || l.ch == 'E' {
-		numBuilder.WriteRune(l.ch)
-		l.readChar()
+	numStr := l.input[startPos:l.position]
 
-		if l.ch == '+' || l.ch == '-' {
-			numBuilder.WriteRune(l.ch)
-			l.readChar()
-		}
-
-		if !unicode.IsDigit(l.ch) {
-			return "", fmt.Errorf("invalid number format: expected digit after exponent indicater")
-		}
-
-		for unicode.IsDigit(l.ch) {
-			numBuilder.WriteRune(l.ch)
-			l.readChar()
-		}
+	// Validate number using strconv
+	if _, err := strconv.ParseFloat(numStr, 64); err != nil {
+		return "", fmt.Errorf("invalid number format: %v", err)
 	}
 
-	return numBuilder.String(), nil
+	// Ensurr that the number is not followed by a letter or digit
+	if unicode.IsLetter(l.ch) || isDigit(l.ch) {
+		return "", fmt.Errorf("invalid character following number")
+	}
+
+	return numStr, nil
 }
 
 // consumeMinus handles the optional minus sign
@@ -252,16 +232,73 @@ func (l *Lexer) consumeMinus() error {
 	return nil
 }
 
+// consumeInteger parses the integer part and enforces no leading zeros
+func (l *Lexer) consumeInteger() error {
+	if l.ch == '0' {
+		l.readChar()
+		// Leading zeros are not allowed unless the number is exactly '0'
+		if isDigit(l.ch) {
+			return fmt.Errorf("invalid number format: leading zeros are not allowed")
+		}
+	} else if isDigitOneToNine(l.ch) {
+		for isDigit(l.ch) {
+			l.readChar()
+		}
+	} else {
+		return fmt.Errorf("expected digit in number")
+	}
+
+	return nil
+}
+
+// consumeFraction parses the fractional part of the number
+func (l *Lexer) consumeFraction() error {
+	if l.ch == '.' {
+		l.readChar()
+		if !isDigit(l.ch) {
+			return fmt.Errorf("expected digit after decimal point")
+		}
+		for isDigit(l.ch) {
+			l.readChar()
+		}
+	}
+	return nil
+}
+
+// consumeExponent parses the exponent part of the number
+func (l *Lexer) consumeExponent() error {
+	if l.ch == 'e' || l.ch == 'E' {
+		l.readChar()
+		if l.ch == '+' || l.ch == '-' {
+			l.readChar()
+		}
+		if !isDigit(l.ch) {
+			return fmt.Errorf("expected digit after exponent")
+		}
+		for isDigit(l.ch) {
+			l.readChar()
+		}
+	}
+
+	return nil
+}
+
+// isDigit checks if the rune is a digit (0-9)
+func isDigit(ch rune) bool {
+	return '0' <= ch && ch <= '9'
+}
+
+// isDigitOnetoNine checks if the rune is a digit between 1 and 9
+func isDigitOneToNine(ch rune) bool {
+	return ch >= '1' && ch <= '9'
+}
+
 func isHighSurrogate(r rune) bool {
 	return r >= 0xD800 && r <= 0xDBFF
 }
 
 func isLowSurrogate(r rune) bool {
 	return r >= 0xDC00 && r <= 0xDFFF
-}
-
-func isDigit(ch byte) bool {
-	return '0' <= ch && ch <= '9'
 }
 
 func (l *Lexer) readString() (string, error) {

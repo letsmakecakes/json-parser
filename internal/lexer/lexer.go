@@ -74,6 +74,15 @@ func (l *Lexer) readChar() {
 	l.readPosition++
 }
 
+// peekChar peeks ahead to the next character without advancing the lexer
+func (l *Lexer) peekChar() rune {
+	if l.readPosition >= len(l.input) {
+		return 0
+	}
+	r, _ := utf8.DecodeLastRuneInString(l.input[l.readPosition:])
+	return r
+}
+
 func (l *Lexer) skipWhitespace() {
 	for isWhitespace(l.ch) {
 		l.readChar()

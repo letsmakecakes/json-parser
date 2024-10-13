@@ -191,7 +191,12 @@ func (l *Lexer) isStartOfNumber(r rune) bool {
 // readNumber reads a number token from the input, including exponents
 func (l *Lexer) readNumber() (string, error) {
 	startPos := l.position
-	hasDigits := false
+	startLine := l.line
+	startColumn := l.column
+
+	if err := l.consumeMinus(); err != nil {
+		return "", err
+	}
 
 	// Handle optional minus sign
 	if l.ch == '-' {
@@ -237,6 +242,14 @@ func (l *Lexer) readNumber() (string, error) {
 	}
 
 	return numBuilder.String(), nil
+}
+
+// consumeMinus handles the optional minus sign
+func (l *Lexer) consumeMinus() error {
+	if l.ch == '-' {
+		l.readChar()
+	}
+	return nil
 }
 
 func isHighSurrogate(r rune) bool {

@@ -166,6 +166,21 @@ func (l *Lexer) Tokenize() ([]Token, error) {
 	return tokens, nil
 }
 
+// peekKeyword checks if the upcoming characters match the expected keyword
+func (l *Lexer) peekKeyWord(expected string) bool {
+	for i, _ := range expected {
+		pos := l.readPosition
+		if pos+i >= len(l.input) {
+			return false
+		}
+		runeAt, _ := utf8.DecodeLastRuneInString(l.input[pos+i:])
+		if runeAt != rune(expected[i]) {
+			return false
+		}
+	}
+	return true
+}
+
 func isHighSurrogate(r rune) bool {
 	return r >= 0xD800 && r <= 0xDBFF
 }
@@ -310,14 +325,6 @@ func (l *Lexer) readNumber() (string, error) {
 	}
 
 	return l.input[position:l.position], nil
-}
-
-func (l *Lexer) peekWord(n int) string {
-	end := l.readPosition + n - 1
-	if end > len(l.input) {
-		end = len(l.input)
-	}
-	return l.input[l.position:end]
 }
 
 func (l *Lexer) advanceBy(n int) {

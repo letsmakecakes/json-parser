@@ -128,21 +128,21 @@ func (l *Lexer) Tokenize() ([]Token, error) {
 				tok = Token{Type: TokenTrue, Literal: "true", Line: l.line, Column: l.column}
 				l.advanceBy(len("true"))
 			} else {
-				return nil, fmt.Errorf("invalid token starting with 't'")
+				return nil, fmt.Errorf("Lexer error at line %d, column %d: invalid token starting with 't'", l.line, l.column)
 			}
 		case 'f':
 			if l.peeKeykWord("false") {
 				tok = Token{Type: TokenFalse, Literal: "false", Line: l.line, Column: l.column}
 				l.advanceBy(len("false"))
 			} else {
-				return nil, fmt.Errorf("invalid token starting with 'f'")
+				return nil, fmt.Errorf("Lexer error at line %d, column %d: invalid token starting with 'f'", l.line, l.column)
 			}
 		case 'n':
 			if l.peekKeyWord("null") {
 				tok = Token{Type: TokenNull, Literal: "null", Line: l.line, Column: l.column}
 				l.advanceBy(len("null"))
 			} else {
-				return nil, fmt.Errorf("invalid token starting with 'n'")
+				return nil, fmt.Errorf("Lexer error at line %d, column %d: invalid token starting with 'n'", l.line, l.column)
 			}
 		default:
 			if l.isStartOfNumber(l.ch) {
@@ -152,7 +152,7 @@ func (l *Lexer) Tokenize() ([]Token, error) {
 				}
 				tok = Token{Type: TokenNumber, Literal: num, Line: l.line, Column: l.column}
 			} else {
-				return nil, fmt.Errorf("unexpected character: %c", l.ch)
+				return nil, fmt.Errorf("Lexer error at line %d, column %d: unexpected character: %c", l.ch, l.line, l.column)
 			}
 		}
 
@@ -179,6 +179,18 @@ func (l *Lexer) peekKeyWord(expected string) bool {
 		}
 	}
 	return true
+}
+
+// advanceBy advances the lexer by n characters
+func (l *Lexer) advanceBy(n int) {
+	for i := 0; i < n; i++ {
+		l.readChar()
+	}
+}
+
+// isStartOfNumber checks if the rune can start a number
+func (l *Lexer) isStartOfNumber(r rune) bool {
+	return r == '-' || unicode.IsDigit(r)
 }
 
 func isHighSurrogate(r rune) bool {
@@ -325,10 +337,4 @@ func (l *Lexer) readNumber() (string, error) {
 	}
 
 	return l.input[position:l.position], nil
-}
-
-func (l *Lexer) advanceBy(n int) {
-	for i := 0; i < n; i++ {
-		l.readChar()
-	}
 }

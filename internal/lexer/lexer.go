@@ -3,6 +3,7 @@ package lexer
 import (
 	"fmt"
 	"strings"
+	"unicode"
 	"unicode/utf16"
 	"unicode/utf8"
 )
@@ -83,8 +84,9 @@ func (l *Lexer) peekChar() rune {
 	return r
 }
 
+// skipWhiteSpace skips over any whitespace characters
 func (l *Lexer) skipWhitespace() {
-	for isWhitespace(l.ch) {
+	for unicode.IsSpace(l.ch) {
 		l.readChar()
 	}
 }

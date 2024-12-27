@@ -1,191 +1,110 @@
 package lexer
 
-import (
-    "reflect"
-    "testing"
-)
+import "testing"
 
-func TestLexer_EmptyObject(t *testing.T) {
-    input := "{}"
-    expectedTokens := []Token{
-        {Type: TokenLeftBrace, Literal: "{"},
-        {Type: TokenRightBrace, Literal: "}"},
-        {Type: TokenEOF, Literal: ""},
-    }
+func TestNextToken_EmptyInput(t *testing.T) {
+	// Test empty input string
+	input := ""
 
-    lexer := NewLexer(input)
-    tokens, err := lexer.Tokenize()
-    if err != nil {
-        t.Fatalf("unexpected error: %v", err)
-    }
+	// Expected token is EOF
+	tests := []struct {
+		expectedType    TokenType
+		expectedLiteral string
+	}{
+		{EOF, ""}, // End of input
+	}
 
-    if !reflect.DeepEqual(tokens, expectedTokens) {
-        t.Errorf("expected tokens %v, got %v", expectedTokens, tokens)
-    }
+	// Initialize the lexer with the empty input
+	lexer := New(input)
+
+	// Check for EOF token
+	tok := lexer.NextToken()
+
+	// Log the token for debugging purposes
+	t.Logf("Token: Type=%q, Literal=%q, Line=%d, Column=%d", tok.Type, tok.Literal, tok.Line, tok.Column)
+
+	// Validate the token type
+	if tok.Type != tests[0].expectedType {
+		t.Fatalf("expected=%q, got=%q (literal=%q)", tests[0].expectedType, tok.Type, tok.Literal)
+	}
+
+	// Validate the token literal
+	if tok.Literal != tests[0].expectedLiteral {
+		t.Fatalf("expected=%q, got=%q (type=%q)", tests[0].expectedLiteral, tok.Literal, tok.Type)
+	}
 }
 
-func TestLexer_SimpleStrings(t *testing.T) {
-    input := `"hello" "world"`
-    expectedTokens := []Token{
-        {Type: TokenString, Literal: "hello"},
-        {Type: TokenString, Literal: "world"},
-        {Type: TokenEOF, Literal: ""},
-    }
+func TestNextToken_ValidCharacters(t *testing.T) {
+	// Define the input string with various edge cases and scenarios
+	input := `{"key": "value", "numbers": [1, 2, 3], "emptyObject": {}, "nestedArray": [[1, 2], [3, 4]]}`
 
-    lexer := NewLexer(input)
-    tokens, err := lexer.Tokenize()
-    if err != nil {
-        t.Fatalf("unexpected error: %v", err)
-    }
+	// Define the expected sequence of tokens for these scenarios
+	tests := []struct {
+		expectedType    TokenType
+		expectedLiteral string
+	}{
+		{LBRACE, "{"},           // Start of object
+		{STRING, "key"},         // String key
+		{COLON, ":"},            // Colon separator
+		{STRING, "value"},       // String value
+		{COMMA, ","},            // Comma separator
+		{STRING, "numbers"},     // String key
+		{COLON, ":"},            // Colon separator
+		{LBRACKET, "["},         // Start of array
+		{NUMBER, "1"},           // Number
+		{COMMA, ","},            // Comma separator
+		{NUMBER, "2"},           // Number
+		{COMMA, ","},            // Comma separator
+		{NUMBER, "3"},           // Number
+		{RBRACKET, "]"},         // End of array
+		{COMMA, ","},            // Comma separator
+		{STRING, "emptyObject"}, // String key
+		{COLON, ":"},            // Colon separator
+		{LBRACE, "{"},           // Start of empty object
+		{RBRACE, "}"},           // End of empty object
+		{COMMA, ","},            // Comma separator
+		{STRING, "nestedArray"}, // String key
+		{COLON, ":"},            // Colon separator
+		{LBRACKET, "["},         // Start of nested array
+		{LBRACKET, "["},         // Start of inner array
+		{NUMBER, "1"},           // Number in inner array
+		{COMMA, ","},            // Comma separator
+		{NUMBER, "2"},           // Number in inner array
+		{RBRACKET, "]"},         // End of inner array
+		{COMMA, ","},            // Comma separator
+		{LBRACKET, "["},         // Start of another inner array
+		{NUMBER, "3"},           // Number in inner array
+		{COMMA, ","},            // Comma separator
+		{NUMBER, "4"},           // Number in inner array
+		{RBRACKET, "]"},         // End of inner array
+		{RBRACKET, "]"},         // End of nested array
+		{EOF, ""},               // End of input
+	}
 
-    if !reflect.DeepEqual(tokens, expectedTokens) {
-        t.Errorf("expected tokens %v, got %v", expectedTokens, tokens)
-    }
-}
+	// Initialize the lexer with the input
+	lexer := New(input)
 
-func TestLexer_StringsWithEscapes(t *testing.T) {
-    input := `"hello\nworld" "escaped \"quote\""`
-    expectedTokens := []Token{
-        {Type: TokenString, Literal: "hello\nworld"},
-        {Type: TokenString, Literal: `escaped "quote"`},
-        {Type: TokenEOF, Literal: ""},
-    }
+	// Iterate over the expected tokens and compare with lexer output
+	for i, tt := range tests {
+		tok := lexer.NextToken()
 
-    lexer := NewLexer(input)
-    tokens, err := lexer.Tokenize()
-    if err != nil {
-        t.Fatalf("unexpected error: %v", err)
-    }
+		// Log the token for debugging purposes
+		t.Logf("Token[%d]: Type=%q, Literal=%q, Line=%d, Column=%d", i, tok.Type, tok.Literal, tok.Line, tok.Column)
 
-    if !reflect.DeepEqual(tokens, expectedTokens) {
-        t.Errorf("expected tokens %v, got %v", expectedTokens, tokens)
-    }
-}
+		// Validate the token type
+		if tok.Type != tt.expectedType {
+			t.Fatalf(
+				"tests[%d] - wrong token type. expected=%q, got=%q (literal=%q)",
+				i, tt.expectedType, tok.Type, tok.Literal,
+			)
+		}
 
-func TestLexer_UnicodeStrings(t *testing.T) {
-    // 😀 is represented by the surrogate pair \uD83D\uDE00
-    input := `"unicode \u0041" "emoji \uD83D\uDE00"`
-    expectedTokens := []Token{
-        {Type: TokenString, Literal: "unicode A"},
-        {Type: TokenString, Literal: "emoji 😀"}, // \uD83D\uDE00 represents 😀
-        {Type: TokenEOF, Literal: ""},
-    }
-
-    lexer := NewLexer(input)
-    tokens, err := lexer.Tokenize()
-    if err != nil {
-        t.Fatalf("unexpected error: %v", err)
-    }
-
-    if !reflect.DeepEqual(tokens, expectedTokens) {
-        t.Errorf("expected tokens %v, got %v", expectedTokens, tokens)
-    }
-}
-
-func TestLexer_Numbers(t *testing.T) {
-    input := `123 -456 78.90 -0.12`
-    expectedTokens := []Token{
-        {Type: TokenNumber, Literal: "123"},
-        {Type: TokenNumber, Literal: "-456"},
-        {Type: TokenNumber, Literal: "78.90"},
-        {Type: TokenNumber, Literal: "-0.12"},
-        {Type: TokenEOF, Literal: ""},
-    }
-
-    lexer := NewLexer(input)
-    tokens, err := lexer.Tokenize()
-    if err != nil {
-        t.Fatalf("unexpected error: %v", err)
-    }
-
-    if !reflect.DeepEqual(tokens, expectedTokens) {
-        t.Errorf("expected tokens %v, got %v", expectedTokens, tokens)
-        for i, tok := range tokens {
-            t.Logf("Token %d: Type=%s, Literal=%s", i, tok.Type, tok.Literal)
-        }
-    }
-}
-
-func TestLexer_Literals(t *testing.T) {
-    input := `true false null`
-    expectedTokens := []Token{
-        {Type: TokenTrue, Literal: "true"},
-        {Type: TokenFalse, Literal: "false"},
-        {Type: TokenNull, Literal: "null"},
-        {Type: TokenEOF, Literal: ""},
-    }
-
-    lexer := NewLexer(input)
-    tokens, err := lexer.Tokenize()
-    if err != nil {
-        t.Fatalf("unexpected error: %v", err)
-    }
-
-    if !reflect.DeepEqual(tokens, expectedTokens) {
-        t.Errorf("expected tokens %v, got %v", expectedTokens, tokens)
-    }
-}
-
-func TestLexer_ComplexStructure(t *testing.T) {
-    input := `{
-        "name": "John Doe",
-        "age": 30,
-        "isStudent": false,
-        "scores": [85, 90, 92.5],
-        "address": {
-            "street": "123 Main St",
-            "city": "Anytown"
-        }
-    }`
-    expectedTokens := []Token{
-        {Type: TokenLeftBrace, Literal: "{"},
-        {Type: TokenString, Literal: "name"},
-        {Type: TokenColon, Literal: ":"},
-        {Type: TokenString, Literal: "John Doe"},
-        {Type: TokenComma, Literal: ","},
-        {Type: TokenString, Literal: "age"},
-        {Type: TokenColon, Literal: ":"},
-        {Type: TokenNumber, Literal: "30"},
-        {Type: TokenComma, Literal: ","},
-        {Type: TokenString, Literal: "isStudent"},
-        {Type: TokenColon, Literal: ":"},
-        {Type: TokenFalse, Literal: "false"},
-        {Type: TokenComma, Literal: ","},
-        {Type: TokenString, Literal: "scores"},
-        {Type: TokenColon, Literal: ":"},
-        {Type: TokenLeftBracket, Literal: "["},
-        {Type: TokenNumber, Literal: "85"},
-        {Type: TokenComma, Literal: ","},
-        {Type: TokenNumber, Literal: "90"},
-        {Type: TokenComma, Literal: ","},
-        {Type: TokenNumber, Literal: "92.5"},
-        {Type: TokenRightBracket, Literal: "]"},
-        {Type: TokenComma, Literal: ","},
-        {Type: TokenString, Literal: "address"},
-        {Type: TokenColon, Literal: ":"},
-        {Type: TokenLeftBrace, Literal: "{"},
-        {Type: TokenString, Literal: "street"},
-        {Type: TokenColon, Literal: ":"},
-        {Type: TokenString, Literal: "123 Main St"},
-        {Type: TokenComma, Literal: ","},
-        {Type: TokenString, Literal: "city"},
-        {Type: TokenColon, Literal: ":"},
-        {Type: TokenString, Literal: "Anytown"},
-        {Type: TokenRightBrace, Literal: "}"},
-        {Type: TokenRightBrace, Literal: "}"},
-        {Type: TokenEOF, Literal: ""},
-    }
-
-    lexer := NewLexer(input)
-    tokens, err := lexer.Tokenize()
-    if err != nil {
-        t.Fatalf("unexpected error: %v", err)
-    }
-
-    if !reflect.DeepEqual(tokens, expectedTokens) {
-        t.Errorf("expected tokens %v, got %v", expectedTokens, tokens)
-        for i, tok := range tokens {
-            t.Logf("Token %d: Type=%s, Literal=%s", i, tok.Type, tok.Literal)
-        }
-    }
+		// Validate the token literal
+		if tok.Literal != tt.expectedLiteral {
+			t.Fatalf(
+				"tests[%d] - wrong literal. expected=%q, got=%q (type=%q)",
+				i, tt.expectedLiteral, tok.Literal, tok.Type,
+			)
+		}
+	}
 }

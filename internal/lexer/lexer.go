@@ -107,7 +107,12 @@ func (l *Lexer) readString() Token {
 // readNumber reads a numeric literal.
 func (l *Lexer) readNumber() string {
 	start := l.position
-	for isDigit(l.ch) {
+	decimalSeen := false
+
+	for isDigit(l.ch) || (l.ch == '.' && !decimalSeen) {
+		if l.ch == '.' {
+			decimalSeen = true
+		}
 		l.readChar()
 	}
 	return l.input[start:l.position]

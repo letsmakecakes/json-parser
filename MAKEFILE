@@ -1,0 +1,63 @@
+.PHONY: all build test clean install fmt lint test-steps run-verbose bench
+
+# Build settings
+BINARY_NAME := jsonparser
+BUILD_DIR := build
+TEST_DIR := test
+
+# Default target
+all: clean build test
+
+# Build the binary
+build:
+	@echo "Building..."
+	@mkdir -p $(BUILD_DIR)
+	@go build -o $(BUILD_DIR)/$(BINARY_NAME) ./cmd/parser
+
+# Run tests
+test:
+	@echo "Running tests..."
+	@go test ./...
+
+# Clean build directory
+clean:
+	@echo "Cleaning..."
+	@rm -rf $(BUILD_DIR)
+
+# Install the binary
+install:
+	@echo "Installing..."
+	@go install ./cmd/parser
+
+# Format and lint code
+fmt:
+	@echo "Formatting code..."
+	@go fmt ./...
+
+lint:
+	@echo "Linting code..."
+	@golangci-lint run
+
+# Run tests for specific steps
+test-steps: test-step1 test-step2 test-step3 test-step4
+
+define TEST_STEP_TEMPLATE
+test-step$(1):
+	@echo "Running Step $(1) tests..."
+	@for f in $(TEST_DIR)/step$(1)/*.json; do \
+		echo "Testing $$f"; \
+		./$(BUILD_DIR)/$(BINARY_NAME) "$$f" || exit 1; \
+	done
+endef
+
+$(eval $(call TEST_STEP_TEMPLATE,1))
+$(eval $(call TEST_STEP_TEMPLATE,2))
+$(eval $(call TEST_STEP_TEMPLATE,3))
+$(eval $(call TEST_STEP_TEMPLATE,4))
+
+# Run with specific features
+run-verbose:
+	@./$(BUILD_DIR)/$(BINARY_NAME) -verbose $(TEST_DIR)/step1/valid.json
+
+bench:
+	@./$(BUILD_DIR)/$(BINARY_NAME) -benchmark $(TEST_DIR)/step4/complex.json

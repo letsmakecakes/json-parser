@@ -1,15 +1,16 @@
 package validator
 
 import (
+	"github.com/letsmakecakes/jsonparser/internal/parser"
 	"github.com/letsmakecakes/jsonparser/pkg/errors"
 	"regexp"
+	"strconv"
 	"unicode"
 )
 
 // Validator validates JSON elements, such as depth, strings, and numbers.
 type Validator struct {
-	maxDepth     int
-	currentDepth int
+	maxDepth int
 }
 
 // New creates a new Validator with a specified maximum nesting depth.
@@ -19,20 +20,44 @@ func New(maxDepth int) *Validator {
 	}
 }
 
-// ValidateDepth increments the current depth and checks if it exceeds the maximum depth.
-func (v *Validator) ValidateDepth() error {
-	v.currentDepth++
-	if v.currentDepth > v.maxDepth {
-		return errors.NewValidationError("exceeded maximum nesting depth")
-	}
-	return nil
+// Validate traverses the AST and validates the JSON structure.
+func (v *Validator) Validate(node parser.Node) error {
+	return v.validateNode(node, 0)
 }
 
-// ExitDepth decrements the current depth, ensuring it does not go below zero.
-func (v *Validator) ExitDepth() {
-	if v.currentDepth > 0 {
-		v.currentDepth--
+// validateNode recursively validates a node and its children, checking depth and other constraints.
+func (v *Validator) validateNode(node parser.Node, depth int) error {
+	if depth > v.maxDepth {
+		return errors.NewValidationError("exceeded maximum nesting depth")
 	}
+
+	switch n := node.(type) {
+	case *parser.ObjectValue:
+		for key, value := range n.Pairs {
+			if err := v.ValidateString(key); err != nil {
+				return err
+			}
+			if err := v.validateNode(value, depth+1); err != nil {
+				return err
+			}
+		}
+	case *parser.ArrayValue:
+		for _, elem := range n.Elements {
+			if err := v.validateNode(elem, depth+1); err != nil {
+				return err
+			}
+		}
+	case *parser.StringValue:
+		return v.ValidateString(n.Value)
+	case *parser.NumberValue:
+		return v.ValidateNumber(n.Value)
+	case *parser.BooleanValue, *parser.NullValue:
+	// No specific validation needed for boolean or null
+	default:
+		return errors.NewValidationError("unknown node type")
+	}
+
+	return nil
 }
 
 // ValidateString checks if a string contains invalid control characters.
@@ -46,7 +71,9 @@ func (v *Validator) ValidateString(s string) error {
 }
 
 // ValidateNumber validates if a string represents a valid number in JSON format.
-func (v *Validator) ValidateNumber(numStr string) error {
+func (v *Validator) ValidateNumber(num float64) error {
+	// Convert the float64 to a string for regex validation
+	numStr := strconv.FormatFloat(num, 'f', -1, 64)
 	// JSON number regex based on ECMA-404 specification
 	numberRegex := `^-?(0|[1-9][0-9]*)(\.[0-9]+)?([eE][+-]?[0-9]+)?$`
 

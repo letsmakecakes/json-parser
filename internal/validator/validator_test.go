@@ -1,20 +1,40 @@
 package validator
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/letsmakecakes/jsonparser/internal/parser"
+)
 
 func TestValidator(t *testing.T) {
 	t.Run("Test Depth Validation", func(t *testing.T) {
 		v := New(3)
 
-		// Test within limit
-		for i := 0; i < 3; i++ {
-			if err := v.ValidateDepth(); err != nil {
-				t.Errorf("unexpected error at depth %d: %v", i, err)
-			}
+		// Create an AST with nested objects within the limit
+		validNode := &parser.ObjectValue{Pairs: map[string]parser.Value{
+			"level1": &parser.ObjectValue{Pairs: map[string]parser.Value{
+				"level2": &parser.ObjectValue{Pairs: map[string]parser.Value{
+					"level3": &parser.StringValue{Value: "value"},
+				}},
+			}},
+		}}
+
+		if err := v.Validate(validNode); err != nil {
+			t.Errorf("unexpected error for valid nested object: %v", err)
 		}
 
-		// Test exceeding limit
-		if err := v.ValidateDepth(); err == nil {
+		// Create an AST that exceeds the depth limit
+		invalidNode := &parser.ObjectValue{Pairs: map[string]parser.Value{
+			"level1": &parser.ObjectValue{Pairs: map[string]parser.Value{
+				"level2": &parser.ObjectValue{Pairs: map[string]parser.Value{
+					"level3": &parser.ObjectValue{Pairs: map[string]parser.Value{
+						"level4": &parser.StringValue{Value: "value"},
+					}},
+				}},
+			}},
+		}}
+
+		if err := v.Validate(invalidNode); err == nil {
 			t.Error("expected error when exceeding max depth")
 		}
 	})

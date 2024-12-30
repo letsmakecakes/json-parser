@@ -3,6 +3,7 @@ package parser
 import (
 	"fmt"
 	"github.com/letsmakecakes/jsonparser/internal/lexer"
+	"strconv"
 )
 
 // Parser is responsible for parsing tokens into a structured format.
@@ -28,95 +29,133 @@ func (p *Parser) nextToken() {
 	p.peekToken = p.l.NextToken()
 }
 
-// Parse parses the input starting from the root.
-func (p *Parser) Parse() error {
+// Parse parses the input starting from the root and returns the root Node.
+func (p *Parser) Parse() (Node, error) {
 	if p.curToken.Type != lexer.LBRACE {
-		return fmt.Errorf("expected '{', got %s at line %d, column %d", p.curToken.Type, p.curToken.Line, p.curToken.Column)
+		return nil, fmt.Errorf("expected '{', got %s at line %d, column %d", p.curToken.Type, p.curToken.Line, p.curToken.Column)
 	}
+
+	return p.parseObject()
+}
+
+// parseObject parses an object and returns an ObjectValue node.
+func (p *Parser) parseObject() (*ObjectValue, error) {
+	object := &ObjectValue{Pairs: make(map[string]Value)}
 
 	p.nextToken()
 
-	// Handle an empty object.
+	// Handle an empty object
 	if p.curToken.Type == lexer.RBRACE {
 		p.nextToken()
-		return nil
+		return object, nil
 	}
 
 	// Parse object contents.
 	for p.curToken.Type != lexer.EOF {
-		if err := p.parseKeyValue(); err != nil {
-			return err
+		key, err := p.parseKey()
+		if err != nil {
+			return nil, err
 		}
+
+		if p.curToken.Type != lexer.COLON {
+			return nil, fmt.Errorf("expected ':', got %s at line %d, column %d", p.curToken.Type, p.curToken.Line, p.curToken.Column)
+		}
+		p.nextToken()
+
+		value, err := p.parseValue()
+		if err != nil {
+			return nil, err
+		}
+
+		object.Pairs[key] = value
 
 		if p.curToken.Type == lexer.RBRACE {
 			p.nextToken()
-			return nil
+			return object, nil
 		}
 
 		if p.curToken.Type != lexer.COMMA {
-			return fmt.Errorf("expected , or }, got %s at line %d, column %d", p.curToken.Type, p.curToken.Line, p.curToken.Column)
+			return nil, fmt.Errorf("expected ',' or '}', got %s at line %d, column %d", p.curToken.Type, p.curToken.Line, p.curToken.Column)
 		}
 		p.nextToken()
 	}
 
-	return fmt.Errorf("unexpected end of input")
+	return nil, fmt.Errorf("unexpected end of input")
 }
 
-// parseKeyValue parses a key-value pair in an object.
-func (p *Parser) parseKeyValue() error {
-	// Parse key.
+// parseKey parses a key in an object.
+func (p *Parser) parseKey() (string, error) {
 	if p.curToken.Type != lexer.STRING {
-		return fmt.Errorf("expected string key, got %s at line %d, column %d", p.curToken.Type, p.curToken.Line, p.curToken.Column)
+		return "", fmt.Errorf("expected string key, got %s at line %d, column %d", p.curToken.Type, p.curToken.Line, p.curToken.Column)
 	}
+	key := p.curToken.Literal
 	p.nextToken()
-
-	// Parse colon.
-	if p.curToken.Type != lexer.COLON {
-		return fmt.Errorf("expected ':', got %s at line %d, column %d", p.curToken.Type, p.curToken.Line, p.curToken.Column)
-	}
-	p.nextToken()
-
-	// Parse value.
-	return p.parseValue()
+	return key, nil
 }
 
-// parseValue parses a value in an object or array.
-func (p *Parser) parseValue() error {
+// parseValue parses a value in an object or array and returns a Value node.
+func (p *Parser) parseValue() (Value, error) {
 	switch p.curToken.Type {
-	case lexer.STRING, lexer.NUMBER, lexer.TRUE, lexer.FALSE, lexer.NULL:
+	case lexer.STRING:
+		value := &StringValue{Value: p.curToken.Literal}
 		p.nextToken()
-		return nil
+		return value, nil
+	case lexer.NUMBER:
+		// Convert the string literal to a float64
+		numValue, err := strconv.ParseFloat(p.curToken.Literal, 64)
+		if err != nil {
+			return nil, fmt.Errorf("could not parse number: %v", err)
+		}
+		value := &NumberValue{Value: numValue}
+		p.nextToken()
+		return value, nil
+	case lexer.TRUE:
+		value := &BooleanValue{Value: true}
+		p.nextToken()
+		return value, nil
+	case lexer.FALSE:
+		value := &BooleanValue{Value: false}
+		p.nextToken()
+		return value, nil
+	case lexer.NULL:
+		value := &NullValue{}
+		p.nextToken()
+		return value, nil
 	case lexer.LBRACE:
-		return p.Parse()
+		return p.parseObject()
 	case lexer.LBRACKET:
 		return p.parseArray()
 	default:
-		return fmt.Errorf("unexpected token %s at line %d, column %d", p.curToken.Type, p.curToken.Line, p.curToken.Column)
+		return nil, fmt.Errorf("unexpected token %s at line %d, column %d", p.curToken.Type, p.curToken.Line, p.curToken.Column)
 	}
 }
 
-// parseArray parses an array.
-func (p *Parser) parseArray() error {
+// parseArray parses an array and returns an ArrayValue node.
+func (p *Parser) parseArray() (*ArrayValue, error) {
+	array := &ArrayValue{Elements: []Value{}}
+
 	p.nextToken()
 
 	// Handle an empty array.
 	if p.curToken.Type == lexer.RBRACKET {
 		p.nextToken()
-		return nil
+		return array, nil
 	}
 
 	for {
-		if err := p.parseValue(); err != nil {
-			return err
+		value, err := p.parseValue()
+		if err != nil {
+			return nil, err
 		}
+		array.Elements = append(array.Elements, value)
 
 		if p.curToken.Type == lexer.RBRACKET {
 			p.nextToken()
-			return nil
+			return array, nil
 		}
 
 		if p.curToken.Type != lexer.COMMA {
-			return fmt.Errorf("expected ',' or ']', got %s at line %d, column %d", p.curToken.Type, p.curToken.Line, p.curToken.Column)
+			return nil, fmt.Errorf("expected ',' or ']', got %s at line %d, column %d", p.curToken.Type, p.curToken.Line, p.curToken.Column)
 		}
 		p.nextToken()
 	}
